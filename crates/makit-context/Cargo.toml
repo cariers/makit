@@ -1,0 +1,12 @@
+[package]
+name = "makit-context"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+makit-core.workspace = true
+
+[lints]
+workspace = true
