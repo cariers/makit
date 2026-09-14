@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/makit-context","crates/makit-core"]
+members = ["crates/makit-context","crates/makit-core", "crates/makit-machine"]
 resolver = "3"
 
 [workspace.package]

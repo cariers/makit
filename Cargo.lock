@@ -12,3 +12,7 @@ dependencies = [
 [[package]]
 name = "makit-core"
 version = "0.1.0"
+
+[[package]]
+name = "makit-machine"
+version = "0.1.0"
