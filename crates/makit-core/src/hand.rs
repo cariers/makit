@@ -8,7 +8,7 @@
 //! 数组索引相关方法仅操作当前排列中的位置，不是实体牌 ID；上层收到索引操作时应校验
 //! 相应状态版本，避免变更或排序后继续使用旧索引。
 
-use std::{error::Error, fmt, iter::FusedIterator, ops};
+use std::{iter::FusedIterator, ops};
 
 use crate::{Tile, TileCounts, TileMask};
 
@@ -407,9 +407,12 @@ impl HandDiscard {
 }
 
 /// 手牌构造或取牌操作未满足结构约束时的错误。
-#[derive(Clone, Debug, Eq, PartialEq)]
+///
+/// 对外消息使用英文，保留索引、张数或牌编码；不包含底层来源错误。
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum HandError {
     /// 摸牌区起点超出当前牌向量长度。
+    #[error("draw cursor {cursor} exceeds hand length {len}")]
     InvalidDrawCursor {
         /// 请求使用的摸牌区起点。
         cursor: usize,
@@ -417,6 +420,7 @@ pub enum HandError {
         len: usize,
     },
     /// 请求访问的索引不在当前手牌内。
+    #[error("hand index {index} is out of bounds for length {len}")]
     IndexOutOfBounds {
         /// 越界索引。
         index: usize,
@@ -424,11 +428,16 @@ pub enum HandError {
         len: usize,
     },
     /// 同一批取牌重复使用了一个索引。
+    #[error("duplicate hand index {index}")]
     DuplicateIndex {
         /// 重复出现的索引。
         index: usize,
     },
     /// 指定原始牌面的精确副本数不足。
+    #[error(
+        "insufficient copies of tile code {}: required {required}, available {available}",
+        .tile.code()
+    )]
     InsufficientTiles {
         /// 缺少的原始牌面，不执行通配解释。
         tile: Tile,
@@ -438,34 +447,6 @@ pub enum HandError {
         available: usize,
     },
 }
-
-/// 将结构化错误格式化为可对外展示的英文消息。
-impl fmt::Display for HandError {
-    /// 输出错误类别及对应索引、张数或牌编码。
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InvalidDrawCursor { cursor, len } => {
-                write!(f, "draw cursor {cursor} exceeds hand length {len}")
-            }
-            Self::IndexOutOfBounds { index, len } => {
-                write!(f, "hand index {index} is out of bounds for length {len}")
-            }
-            Self::DuplicateIndex { index } => write!(f, "duplicate hand index {index}"),
-            Self::InsufficientTiles {
-                tile,
-                required,
-                available,
-            } => write!(
-                f,
-                "insufficient copies of tile code {}: required {required}, available {available}",
-                tile.code()
-            ),
-        }
-    }
-}
-
-/// 手牌结构错误不包含底层来源错误。
-impl Error for HandError {}
 
 /// 将原始牌向量作为初始旧牌构造手牌。
 impl From<Vec<Tile>> for Hand {

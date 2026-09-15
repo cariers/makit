@@ -2,7 +2,7 @@
 
 use std::{fmt, marker::PhantomData, ops::Deref};
 
-use crate::{DispatchResult, MachineContext, State, machine::inner::Inner};
+use crate::{Error, MachineContext, State, machine::inner::Inner};
 
 /// [`StrictMachine`] 已完成初始化的类型标记。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,12 +68,16 @@ where
     M: MachineContext,
     M::State: State<M>,
 {
-    /// 派发一次输入，返回处理结果。
+    /// 派发一次输入，成功时返回有序事件。
     ///
-    /// [`DispatchResult::Unhandled`] 表示当前状态未处理输入，驱动不执行转换钩子。
-    /// [`DispatchResult::Handled`] 表示本次处理与状态切换均已完成，
-    /// 即使事件为空也属于已处理；状态转换不会交给调用方再次执行。
-    pub fn dispatch(&mut self, input: &M::Input<'_>) -> DispatchResult<M::Event> {
+    /// `Ok` 表示本次处理与状态切换均已完成，即使事件为空也属于已处理；
+    /// 状态转换不会交给调用方再次执行。
+    ///
+    /// # Errors
+    ///
+    /// 原样返回 [`State::advance`] 的 [`Error::Unhandled`] 或 [`Error::Custom`]。
+    /// 错误不执行转换钩子；状态实现应保持推进方法入口的状态与上下文，驱动不提供回滚。
+    pub fn dispatch(&mut self, input: &M::Input<'_>) -> Result<Box<[M::Event]>, Error<M::Error>> {
         self.inner.dispatch(input)
     }
 }

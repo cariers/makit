@@ -2,7 +2,7 @@
 //!
 //! 本模块维护固定组集合的结构，不管理手牌、牌河或未决交互，也不校验玩法牌形。
 
-use std::{error::Error, fmt, iter::FusedIterator, ops::Index};
+use std::{iter::FusedIterator, ops::Index};
 
 use crate::{
     ChowMeld, ClaimedKongMeld, ConcealedKongMeld, Meld, MeldKind, PongMeld, Seat, Tile, TileCounts,
@@ -223,9 +223,12 @@ impl<'a> IntoIterator for &'a Melds {
 }
 
 /// 固定组集合操作中的结构化错误。
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+///
+/// 对外消息使用英文，保留组索引及实际状态；不包含底层来源错误。
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum MeldsError {
     /// 请求的组索引超出当前集合范围。
+    #[error("meld index {index} is out of bounds for length {len}")]
     IndexOutOfBounds {
         /// 本次请求的零基组索引。
         index: usize,
@@ -233,6 +236,7 @@ pub enum MeldsError {
         len: usize,
     },
     /// 加杠目标不是尚未升级的碰组。
+    #[error("expected pong at meld index {index}, found {actual:?}")]
     ExpectedPong {
         /// 本次请求升级的组索引。
         index: usize,
@@ -240,19 +244,3 @@ pub enum MeldsError {
         actual: MeldKind,
     },
 }
-
-impl fmt::Display for MeldsError {
-    /// 输出包含组索引及实际状态的英文错误消息。
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::IndexOutOfBounds { index, len } => {
-                write!(f, "meld index {index} is out of bounds for length {len}")
-            }
-            Self::ExpectedPong { index, actual } => {
-                write!(f, "expected pong at meld index {index}, found {actual:?}")
-            }
-        }
-    }
-}
-
-impl Error for MeldsError {}

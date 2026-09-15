@@ -3,7 +3,7 @@
 //! 历史记录不会因取牌而删除或重新编号；只有仍留存的牌参与牌河持有量统计。
 //! 编号作用域、响应窗口、取牌权限与跨容器提交由上层管理。
 
-use std::{error::Error, fmt, iter::FusedIterator};
+use std::iter::FusedIterator;
 
 use crate::{Discard, Seat, Tile};
 
@@ -226,49 +226,32 @@ impl River {
 }
 
 /// 弃牌编号分配或留存牌消费失败的结构化错误。
-#[derive(Clone, Debug, Eq, PartialEq)]
+///
+/// 对外消息使用英文，保留弃牌编号或请求数量；不包含底层来源错误。
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum RiverError {
     /// 当前容器中不存在请求编号对应的历史记录。
+    #[error("unknown discard id {}", .id.value())]
     UnknownDiscard {
         /// 请求查询或消费的弃牌编号。
         id: DiscardId,
     },
     /// 历史记录存在，但对应的牌已被取走。
+    #[error("discard id {} has already been taken", .id.value())]
     AlreadyTaken {
         /// 对应牌已不再留存的弃牌编号。
         id: DiscardId,
     },
     /// 同一批请求重复引用了一次弃牌。
+    #[error("duplicate discard id {}", .id.value())]
     DuplicateDiscard {
         /// 在批内重复出现的弃牌编号。
         id: DiscardId,
     },
     /// 当前编号或平台索引容量无法容纳完整追加批次。
+    #[error("discard id capacity exhausted for {requested} new records")]
     IdExhausted {
         /// 本次请求追加的记录总数。
         requested: usize,
     },
 }
-
-/// 将牌河结构错误格式化为可对外展示的英文消息。
-impl fmt::Display for RiverError {
-    /// 输出错误类别与对应编号或请求数量。
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::UnknownDiscard { id } => write!(f, "unknown discard id {}", id.value()),
-            Self::AlreadyTaken { id } => {
-                write!(f, "discard id {} has already been taken", id.value())
-            }
-            Self::DuplicateDiscard { id } => write!(f, "duplicate discard id {}", id.value()),
-            Self::IdExhausted { requested } => {
-                write!(
-                    f,
-                    "discard id capacity exhausted for {requested} new records"
-                )
-            }
-        }
-    }
-}
-
-/// 牌河结构错误不包含底层来源错误。
-impl Error for RiverError {}

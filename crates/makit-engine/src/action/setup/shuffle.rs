@@ -7,7 +7,7 @@ use makit_core::Wall;
 use rand::{SeedableRng, seq::SliceRandom};
 use rand_chacha::ChaCha20Rng;
 
-use crate::{Action, ActionOutcome, Progress};
+use crate::{Action, Progress};
 
 /// 使用局种子打乱当前剩余牌墙的无配置行动。
 ///
@@ -37,7 +37,9 @@ where
 
     type Event = Shuffled;
 
-    fn start(&mut self, ctx: &mut Context<V>) -> Progress<Self::Event> {
+    type Error = Infallible;
+
+    fn start(&mut self, ctx: &mut Context<V>) -> Result<Progress<Self::Event>, Self::Error> {
         // 只复制剩余区间，避免替换牌墙时将已经取出的牌重新放回。
         let mut tiles = ctx.wall().as_slice().to_vec();
         let mut rng = ChaCha20Rng::from_seed(*ctx.seed().as_bytes());
@@ -50,14 +52,14 @@ where
         }]);
         ctx.replace_wall(wall);
 
-        Progress::Complete(events)
+        Ok(Progress::Complete(events))
     }
 
     fn handle(
         &mut self,
         _: &mut Context<V>,
         input: &Self::Input<'_>,
-    ) -> ActionOutcome<Self::Event> {
+    ) -> Result<Progress<Self::Event>, Self::Error> {
         match *input {}
     }
 }

@@ -2,6 +2,8 @@
 //!
 //! 运行方式：`cargo run -p makit-engine --example shuffle`。
 
+use std::process::ExitCode;
+
 use makit_context::{Context, Variant};
 use makit_core::{Seed, Tile, Wall};
 use makit_engine::{Action, Progress, action::setup::Shuffle};
@@ -21,7 +23,7 @@ impl Variant for DemoVariant {
     }
 }
 
-fn main() {
+fn main() -> ExitCode {
     let mut ctx = DemoVariant::initial_context(());
     ctx.replace_wall(Wall::from_tiles([
         Tile::MAN_1,
@@ -39,8 +41,9 @@ fn main() {
 
     let mut shuffle = Shuffle;
     let (status, events) = match Action::start(&mut shuffle, &mut ctx) {
-        Progress::Running(events) => ("Running", events),
-        Progress::Complete(events) => ("Complete", events),
+        Ok(Progress::Running(events)) => ("Running", events),
+        Ok(Progress::Complete(events)) => ("Complete", events),
+        Err(never) => match never {},
     };
     println!("Progress: {status}");
     println!("Events: {}", events.len());
@@ -50,4 +53,5 @@ fn main() {
 
     let after: Vec<_> = ctx.wall().iter().map(Tile::code).collect();
     println!("After: {after:?}");
+    ExitCode::SUCCESS
 }

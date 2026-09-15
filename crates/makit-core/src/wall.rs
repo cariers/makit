@@ -2,7 +2,7 @@
 //!
 //! 构造时保留输入顺序，不洗牌；开门、补牌及其他玩法约束由上层决定。
 
-use std::{error::Error, fmt, iter::FusedIterator};
+use std::iter::FusedIterator;
 
 use crate::{Tile, TileCounts, TileMask};
 
@@ -185,9 +185,12 @@ impl FromIterator<Tile> for Wall {
 }
 
 /// 牌墙批量取牌时的结构化错误。
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+///
+/// 对外消息使用英文，保留请求值与实际数量；不包含底层来源错误。
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum WallError {
     /// 剩余牌不足以满足完整批次的取牌请求。
+    #[error("insufficient tiles: requested {requested}, remaining {remaining}")]
     InsufficientTiles {
         /// 本次请求取走的张数。
         requested: usize,
@@ -195,20 +198,3 @@ pub enum WallError {
         remaining: usize,
     },
 }
-
-impl fmt::Display for WallError {
-    /// 输出包含请求值与实际数量的英文错误消息。
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InsufficientTiles {
-                requested,
-                remaining,
-            } => write!(
-                f,
-                "insufficient tiles: requested {requested}, remaining {remaining}"
-            ),
-        }
-    }
-}
-
-impl Error for WallError {}

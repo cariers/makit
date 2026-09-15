@@ -2,10 +2,12 @@
 
 mod cli;
 
-use std::{fmt, process::ExitCode};
+use std::process::ExitCode;
 
-use makit::{DispatchResult, Engine, EngineInput, EngineState, IntoMachineState};
-use makit_headless::{DemoEvent, DemoInput, DemoMachine, DemoPhase, DemoRule, DemoVariant};
+use makit::{Engine, EngineInput, EngineState, Error, IntoMachineState};
+use makit_headless::{
+    DemoError, DemoEvent, DemoInput, DemoMachine, DemoPhase, DemoRule, DemoVariant,
+};
 
 fn main() -> ExitCode {
     let options = match cli::parse(std::env::args_os().skip(1)) {
@@ -31,32 +33,23 @@ fn main() -> ExitCode {
 }
 
 /// 预设脚本无法完成时，保留失败输入及实际阶段供诊断。
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 enum RunError {
+    #[error("input {input} was not handled in state {state}")]
     UnhandledInput {
         input: &'static str,
         state: &'static str,
     },
-    MissingOutput {
+    #[error("input {input} failed in state {state}: {source}")]
+    Business {
+        input: &'static str,
         state: &'static str,
+        #[source]
+        source: DemoError,
     },
+    #[error("the preparation script ended without a final output in state {state}")]
+    MissingOutput { state: &'static str },
 }
-
-impl fmt::Display for RunError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::UnhandledInput { input, state } => {
-                write!(formatter, "input {input} was not handled in state {state}")
-            }
-            Self::MissingOutput { state } => write!(
-                formatter,
-                "the preparation script ended without a final output in state {state}"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for RunError {}
 
 fn run(options: cli::Options) -> Result<(), RunError> {
     let rule = DemoRule::new(options.seed, options.align_east);
@@ -78,17 +71,27 @@ fn run(options: cli::Options) -> Result<(), RunError> {
     for (name, input) in script {
         println!("Input: {name}");
         match machine.dispatch(&input) {
-            DispatchResult::Handled { events } => {
+            Ok(events) => {
                 println!("Result: Handled ({} events)", events.len());
                 for event in &events {
                     print_event(event);
                 }
             }
-            DispatchResult::Unhandled => {
+            Err(Error::Unhandled) => {
                 let state = state_name(&machine);
                 println!("Result: Unhandled");
                 println!("State: {state}");
                 return Err(RunError::UnhandledInput { input: name, state });
+            }
+            Err(Error::Custom(source)) => {
+                let state = state_name(&machine);
+                println!("Result: Failed");
+                println!("State: {state}");
+                return Err(RunError::Business {
+                    input: name,
+                    state,
+                    source,
+                });
             }
         }
         println!("State: {}", state_name(&machine));

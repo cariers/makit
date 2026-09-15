@@ -9,7 +9,7 @@ pub use strict::{Initialized, StrictMachine, Uninitialized};
 
 use std::{fmt, ops::Deref};
 
-use crate::{DispatchResult, MachineContext, State, machine::inner::Inner};
+use crate::{Error, MachineContext, State, machine::inner::Inner};
 
 /// 使用运行时标记管理初始化的状态机。
 ///
@@ -68,15 +68,19 @@ where
         }
     }
 
-    /// 按需完成初始化并派发一次输入，返回处理结果。
+    /// 按需完成初始化并派发一次输入，成功时返回有序事件。
     ///
     /// 每次调用先通过 [`init`](Self::init) 确保机器已初始化。
-    /// [`DispatchResult::Unhandled`] 表示当前状态未处理本次输入，驱动不执行切换钩子，
-    /// 但不会撤销首次调用已经完成的初始化；后续派发也不会重放初始进入钩子。
-    /// [`DispatchResult::Handled`] 表示本次处理与状态切换均已完成，
-    /// 即使事件为空也属于已处理；状态转换不会交给调用方再次执行。
-    pub fn dispatch(&mut self, input: &M::Input<'_>) -> DispatchResult<M::Event> {
-        // 初始进入属于机器生命周期，输入未处理不会撤销已完成的初始化。
+    /// `Ok` 表示本次处理与状态切换均已完成，即使事件为空也属于已处理；
+    /// 状态转换不会交给调用方再次执行。
+    ///
+    /// # Errors
+    ///
+    /// 原样返回 [`State::advance`] 的 [`Error::Unhandled`] 或 [`Error::Custom`]。
+    /// 错误不执行转换钩子；状态实现应保持推进方法入口的状态与上下文，驱动不提供回滚。
+    /// 首次派发在推进前完成的初始化会保留，后续派发也不会重放初始进入钩子。
+    pub fn dispatch(&mut self, input: &M::Input<'_>) -> Result<Box<[M::Event]>, Error<M::Error>> {
+        // 初始化属于机器生命周期，后续推进的任一错误都不会撤销它。
         self.init();
         self.inner.dispatch(input)
     }

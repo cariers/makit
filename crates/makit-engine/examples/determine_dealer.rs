@@ -2,7 +2,9 @@
 //!
 //! 运行方式：`cargo run -p makit-engine --example determine_dealer`。
 
-use makit_context::{Context, JoinError, Variant};
+use std::process::ExitCode;
+
+use makit_context::{Context, Variant};
 use makit_core::{Seat, Seed};
 use makit_engine::{Action, Progress, action::setup::DetermineDealer};
 
@@ -21,13 +23,16 @@ impl Variant for DemoVariant {
     }
 }
 
-fn main() -> Result<(), JoinError<()>> {
+fn main() -> ExitCode {
     // 两种配置各自使用相同固定种子创建全新的上下文。
     for align_east in [false, true] {
         let mut ctx = DemoVariant::initial_context(());
         // 编号为 2 的位置缺席；默认东风位置为已加入的 1 号位置。
         for seat in [Seat::ALL[0], Seat::ALL[2], Seat::ALL[3]] {
-            ctx.join(seat, ())?;
+            if let Err(error) = ctx.join(seat, ()) {
+                eprintln!("Error: could not prepare the example seats: {error}");
+                return ExitCode::FAILURE;
+            }
         }
 
         let participants: Vec<_> = ctx.participants().iter().map(Seat::code).collect();
@@ -37,8 +42,12 @@ fn main() -> Result<(), JoinError<()>> {
 
         let mut action = DetermineDealer::new(align_east);
         let (status, events) = match Action::start(&mut action, &mut ctx) {
-            Progress::Running(events) => ("Running", events),
-            Progress::Complete(events) => ("Complete", events),
+            Ok(Progress::Running(events)) => ("Running", events),
+            Ok(Progress::Complete(events)) => ("Complete", events),
+            Err(error) => {
+                eprintln!("Error: dealer determination failed: {error}");
+                return ExitCode::FAILURE;
+            }
         };
         println!("Progress: {status}");
         println!("Events: {}", events.len());
@@ -52,5 +61,5 @@ fn main() -> Result<(), JoinError<()>> {
         println!("Context east: {}", ctx.east().seat().code());
         println!();
     }
-    Ok(())
+    ExitCode::SUCCESS
 }

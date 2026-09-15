@@ -1,6 +1,6 @@
 //! 命令行参数与结构化解析错误，不参与演示阶段的推进。
 
-use std::{ffi::OsString, fmt};
+use std::ffi::OsString;
 
 use makit::Seed;
 
@@ -32,50 +32,27 @@ pub(super) struct Options {
 }
 
 /// 保留可区分原因的命令行错误。
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub(super) enum CliError {
     /// 参数不属于公开命令，包括非 Unicode 的操作系统参数。
+    #[error("unknown argument: {argument:?}")]
     UnknownArgument { argument: OsString },
     /// 同一选项出现多次。
+    #[error("option {option} must not be repeated")]
     DuplicateOption { option: &'static str },
     /// 需要值的选项没有提供值。
+    #[error("option {option} requires a value")]
     MissingValue { option: &'static str },
     /// 种子值不是 Unicode 文本，因而不可能是 ASCII 十六进制。
+    #[error("seed must contain only ASCII hexadecimal digits")]
     NonUnicodeSeed,
     /// 种子字节长度不等于要求的十六进制长度。
+    #[error("seed must contain exactly 64 ASCII hexadecimal digits; received {actual} bytes")]
     SeedLength { actual: usize },
     /// 种子中的字节不是 ASCII 十六进制字符。
+    #[error("seed contains a non-hexadecimal byte 0x{byte:02X} at byte offset {index}")]
     SeedDigit { index: usize, byte: u8 },
 }
-
-impl fmt::Display for CliError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::UnknownArgument { argument } => {
-                write!(formatter, "unknown argument: {argument:?}")
-            }
-            Self::DuplicateOption { option } => {
-                write!(formatter, "option {option} must not be repeated")
-            }
-            Self::MissingValue { option } => {
-                write!(formatter, "option {option} requires a value")
-            }
-            Self::NonUnicodeSeed => {
-                formatter.write_str("seed must contain only ASCII hexadecimal digits")
-            }
-            Self::SeedLength { actual } => write!(
-                formatter,
-                "seed must contain exactly 64 ASCII hexadecimal digits; received {actual} bytes"
-            ),
-            Self::SeedDigit { index, byte } => write!(
-                formatter,
-                "seed contains a non-hexadecimal byte 0x{byte:02X} at byte offset {index}"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for CliError {}
 
 /// 完整解析参数，即使请求帮助，也不吞掉未知或重复参数。
 pub(super) fn parse(arguments: impl IntoIterator<Item = OsString>) -> Result<Command, CliError> {

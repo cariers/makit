@@ -1,7 +1,7 @@
 /// 一次状态推进要求机器应用的转换。
 ///
-/// 该类型属于 [`crate::State::advance`] 的实现协议，外部输入处理只获得
-/// 已完成转换后的 [`crate::DispatchResult`]。
+/// 该类型属于 [`crate::State::advance`] 的成功协议；[`crate::Machine::dispatch`]
+/// 和 [`crate::StrictMachine::dispatch`] 负责完成转换，成功时只向调用方返回事件。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Transition<S> {
     /// 保留当前状态，不调用退出或进入钩子。

@@ -3,7 +3,7 @@
 use makit::engine::action::setup::Shuffle;
 use makit::{Context, PhaseVariant, Seat, Seed, Tile, Variant, Wall};
 
-use crate::{DemoEvent, DemoInput, DemoOutput, DemoPhase};
+use crate::{DemoError, DemoEvent, DemoInput, DemoOutput, DemoPhase};
 
 /// 演示使用的显式种子和东风切换配置。
 ///
@@ -71,6 +71,7 @@ impl PhaseVariant for DemoVariant {
     type Input = DemoInput;
     type Event = DemoEvent;
     type Output = DemoOutput;
+    type Error = DemoError;
 
     fn initial_phase(_: &Context<Self>) -> Self::Phase {
         DemoPhase::Shuffling(Shuffle)

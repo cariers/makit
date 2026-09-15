@@ -1,6 +1,6 @@
 # makit
 
-用于麻将变体开发的 Rust 基础库，提供可共享的领域模型、上下文组合操作、通用状态机和行动编排协议。具体玩法定义规则、输入、事件、阶段及最终结果。
+用于麻将变体开发的 Rust 基础库，提供可共享的领域模型、上下文组合操作、通用状态机和行动编排协议。具体玩法定义规则、输入、事件、错误、阶段及最终结果。
 
 ## 统一入口
 
@@ -47,7 +47,17 @@ flowchart TD
 
 `Tile` 表示牌面，同一牌面的副本等价；`TileMask` 记录成员关系，`TileCounts` 的每种牌面计数独立饱和于 `255`。具体玩法的牌集、通配合法性、吃碰杠权限与胜负计算由变体决定。
 
-`Context<V>` 聚合通用牌区和变体扩展，组合操作维护通用牌区的一致性。`PhaseVariant` 声明玩法输入、事件、最终结果和主阶段；具体 `Phase` 保存执行进度并安排 `Action`。事件面向客户端时的可见范围由使用方处理。
+`Context<V>` 聚合通用牌区和变体扩展，组合操作维护通用牌区的一致性。`PhaseVariant` 声明玩法输入、事件、错误、最终结果和主阶段；具体 `Phase` 保存执行进度并安排 `Action`。事件面向客户端时的可见范围由使用方处理。
+
+`PhaseResult<V>` 固定使用变体声明的阶段、事件、最终结果和业务错误，是 `Result<PhaseOutcome<V::Phase, V::Event, V::Output>, Error<V::Error>>` 的类型别名，由 `makit` 和 `makit::engine` 导出。其他类型仍可实现 `Phase<V>`，返回的阶段转换目标同样是 `V::Phase`。
+
+`PhaseOutcome::Continue(Outcome)` 复用基础状态机的有序事件与阶段转换，`PhaseOutcome::Finished { events, output }` 交付最后一批事件和终态结果。`stay`、`to` 构造继续推进的结果，`finished` 构造结束结果。
+
+`PhaseVariant::Phase` 只声明阶段类型；创建 `Engine` 或转换为尚未初始化的机器不要求它实现 `Phase<V>`。引擎的 `State` 实现在执行边界要求 `V::Phase: Phase<V>`，机器初始化和派发时必须满足此约束。
+
+各 crate 的自定义错误统一使用 `thiserror` 派生 `Display` 和 `std::error::Error`，保留可匹配的结构化字段和底层错误来源。公共 trait 仍使用标准错误 trait 作为约束；不会失败的行动使用 `Infallible`。
+
+执行接口均返回 `Result`。Action 直接返回自身业务错误；Phase 负责路由输入，将行动错误映射为变体错误并包装到 `Error::Custom(E)`。Phase 和 Machine 使用 `Error::Unhandled` 表示输入不适用于当前状态；`Error::map_custom` 用于汇总已经包装的子阶段或子机错误。机器成功派发返回有序事件；错误不追加成功记录或触发转换钩子。返回错误前保持数据不变是实现契约，驱动不提供回滚；首次派发前已完成的初始化会保留。
 
 当前引擎提供启动、阶段处理及终态输出契约，已提供洗牌与定庄行动。具体行牌流程、网络交互和恢复协议需要由后续明确的场景补充。
 

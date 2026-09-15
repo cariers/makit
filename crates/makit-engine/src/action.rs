@@ -10,9 +10,13 @@ use makit_context::{Context, Variant};
 /// 行动实例可以保存收集中的玩家选择等多次交互数据；阶段实现负责决定何时启动行动、
 /// 转交后续输入及处理行动完成，不代替行动内部的业务状态。启动和后续输入均可访问局上下文。
 ///
-/// 启动不提供拒绝结果，调用方应先满足具体行动的前置条件。后续输入返回
-/// [`ActionOutcome::Unhandled`] 前必须完成只读判断，且不得修改行动自身、局上下文、
-/// 随机进度或外部领域事实。该要求依赖实现遵守，不提供自动回滚。
+/// [`Phase`](crate::Phase) 负责判断输入属于哪个行动，再调用对应行动；行动内部只处理
+/// 自身的业务，不重复提供未处理分类。启动与后续输入均返回 `Result`：成功值包含进度和
+/// 有序事件，失败值直接使用 [`Self::Error`] 表达参数、参与资格或自身进度等业务错误。
+///
+/// 业务错误必须在修改行动自身、局上下文、随机进度或外部领域事实之前返回。
+/// 实现应先完成校验和可能失败的候选计算，再提交本次修改；调用其他行动后再返回错误，
+/// 也不能遗留已经提交的领域变化。这是实现契约，行动协议与机器驱动都不提供自动回滚。
 pub trait Action<V>
 where
     V: Variant,
@@ -25,27 +29,45 @@ where
     /// 行动处理产生的事件，业务含义和面向客户端的投影由上层定义。
     type Event;
 
+    /// 行动直接返回的结构化业务错误。
+    ///
+    /// 参数、参与资格和行动自身进度不满足要求时，由具体实现定义可匹配的错误。
+    /// 不存在业务错误时可使用 [`std::convert::Infallible`]；输入路由由阶段负责。
+    type Error: core::error::Error;
+
     /// 使用局上下文启动行动，返回本次处理的进度及事件。
     ///
     /// 可以直接返回 [`Progress::Complete`] 完成洗牌等单次操作，也可以返回
-    /// [`Progress::Running`] 等待后续输入。启动没有未处理分支，前置条件由调用方保证。
-    fn start(&mut self, ctx: &mut Context<V>) -> Progress<Self::Event>;
-
-    /// 在行动运行期间处理一次输入，返回是否处理及已处理时的进度和事件。
+    /// [`Progress::Running`] 等待后续输入；成功返回不要求上层自动执行下一步。
     ///
-    /// [`ActionOutcome::Handled`] 包含 [`Progress::Running`] 或 [`Progress::Complete`]，
-    /// 分别表示行动继续运行或完成，均不要求自动执行下一步。
-    /// 返回 [`ActionOutcome::Unhandled`] 表示未处理，必须在任何领域修改发生前作出该决定。
+    /// # Errors
+    ///
+    /// 启动前提不满足、行动自身进度不允许启动或候选计算失败时，直接返回 [`Self::Error`]。
+    /// 错误须保持方法入口的行动状态和局上下文不变，不产生进度或领域事件；
+    /// 具体业务错误由实现定义。
+    fn start(&mut self, ctx: &mut Context<V>) -> Result<Progress<Self::Event>, Self::Error>;
+
+    /// 在行动运行期间处理一次输入，成功时返回进度和事件。
+    ///
+    /// [`Progress::Running`] 与 [`Progress::Complete`] 分别表示行动继续运行或完成，
+    /// 均不要求自动执行下一步，空事件也可以表示输入已成功处理。
+    ///
+    /// # Errors
+    ///
+    /// 输入参数、参与资格或行动自身进度不满足要求，以及候选计算失败时，直接返回
+    /// [`Self::Error`]。错误不携带进度或事件；实现必须先完成校验或候选计算，
+    /// 保持本次调用入口的行动状态和局上下文不变，协议不自动回滚已经发生的修改。
     fn handle(
         &mut self,
         ctx: &mut Context<V>,
         input: &Self::Input<'_>,
-    ) -> ActionOutcome<Self::Event>;
+    ) -> Result<Progress<Self::Event>, Self::Error>;
 }
 
 /// 行动在启动或一次已处理输入后的执行进度。
 ///
-/// 两种进度均携带有序事件，允许为空；未处理输入由 [`ActionOutcome::Unhandled`] 表达。
+/// 两种进度均携带有序事件，允许为空，只出现在成功返回值中；业务错误通过
+/// [`Action::Error`] 直接返回，不携带执行进度。
 /// 本类型不指示通用状态机自动循环、切换阶段或构造后续输入。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Progress<T> {
@@ -53,19 +75,4 @@ pub enum Progress<T> {
     Running(Box<[T]>),
     /// 本次处理已完成，行动结束。
     Complete(Box<[T]>),
-}
-
-/// 行动对一次后续输入的处理结果。
-///
-/// 已处理时返回执行进度及事件，未处理时不附带事件；该结果不直接指定阶段转换。
-/// 行动启动使用 [`Progress`]，不会返回本类型的未处理分支。
-#[must_use]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ActionOutcome<T> {
-    /// 本次输入已处理，包含行动进度与有序事件，是否切换阶段由上层决定。
-    Handled(Progress<T>),
-    /// 行动未处理本次输入，不附带事件或执行进度。
-    ///
-    /// 不会自动回滚实现已做的修改；实现须在修改行动或领域数据之前决定返回该结果。
-    Unhandled,
 }

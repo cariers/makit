@@ -10,6 +10,7 @@ publish = false
 
 [dependencies]
 makit.workspace = true
+thiserror.workspace = true
 
 [lints]
 workspace = true

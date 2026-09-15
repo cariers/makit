@@ -1,4 +1,4 @@
-use crate::{DispatchResult, MachineContext, Outcome, State, Transition};
+use crate::{Error, MachineContext, Outcome, State, Transition};
 
 /// 两种包装器共用的状态存储与单次推进逻辑。
 pub(super) struct Inner<M>
@@ -39,20 +39,19 @@ where
         self.state.handle_entry_action(&mut self.context);
     }
 
-    pub(super) fn dispatch(&mut self, input: &M::Input<'_>) -> DispatchResult<M::Event> {
-        let Outcome::Handled { events, transition } = self.state.advance(&mut self.context, input)
-        else {
-            // 未处理只终止本次派发，实现须保证此前没有产生领域修改。
-            return DispatchResult::Unhandled;
-        };
+    pub(super) fn dispatch(
+        &mut self,
+        input: &M::Input<'_>,
+    ) -> Result<Box<[M::Event]>, Error<M::Error>> {
+        // 错误直接终止本次推进，不执行转换钩子；修改一致性由状态实现保证。
+        let Outcome { events, transition } = self.state.advance(&mut self.context, input)?;
 
         if let Transition::To(next) = transition {
             self.state.handle_exit_action(&mut self.context);
             self.state = next;
             self.state.handle_entry_action(&mut self.context);
         }
-
-        DispatchResult::Handled { events }
+        Ok(events)
     }
 }
 

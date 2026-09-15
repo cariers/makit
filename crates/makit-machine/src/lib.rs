@@ -1,8 +1,8 @@
 //! 使用独立上下文与输入处理结果驱动的通用状态机。
 //!
-//! [`MachineContext`] 定义单个机器持有的上下文及其状态、输入和事件类型。
-//! [`State`] 实现输入处理及进入和退出钩子；[`Outcome`] 表达已处理或未处理，
-//! 已处理时携带事件与 [`Transition`]，由机器驱动消费。
+//! [`MachineContext`] 定义单个机器持有的上下文及其状态、输入、事件和业务错误类型。
+//! [`State`] 实现输入处理及进入和退出钩子；成功值 [`Outcome`] 携带事件与
+//! [`Transition`]，由机器驱动消费。错误值 [`Error`] 区分未处理与具体业务错误。
 //!
 //! [`IntoMachineState`] 为实现 [`MachineContext`] 的上下文提供构造入口：
 //! [`into_machine`](IntoMachineState::into_machine) 创建延时初始化的 [`Machine`]，
@@ -12,42 +12,42 @@
 //! 由它判断是否需要执行初始进入钩子。严格机器通过 `init` 显式转换到 [`Initialized`]
 //! 阶段后才能派发。两种包装器共用内部驱动，并通过只读解引用访问上下文。
 //!
-//! [`DispatchResult`] 表达已经完成的处理结果：未处理，或已处理及其有序事件。
-//! 事件为空仍可能表示已处理，不应据此重新投递输入。状态切换完成后才返回处理结果。
+//! [`Machine::dispatch`] 和 [`StrictMachine::dispatch`] 使用 [`Result`] 返回有序事件
+//! 或执行错误。成功时事件允许为空，不应据此重新投递输入；状态切换完成后才返回事件。
 //! 普通机器派发输入时先调用 `init` 再调用 [`State::advance`]；
-//! 若本次调用实际完成了初始化，即使输入未处理，初始化对状态和上下文的修改也会保留。
+//! 若本次调用实际完成了初始化，即使后续返回错误，初始化对状态和上下文的修改也会保留。
 //!
 //! ```mermaid
 //! flowchart TD
 //!     Input[Machine 接收输入] --> Ensure[调用幂等 init]
 //!     Ensure --> Initialized{已经初始化}
-//!     Initialized -->|是| Advance[advance 产生 Outcome]
+//!     Initialized -->|是| Advance[调用 advance]
 //!     Initialized -->|否| Init[执行初始进入钩子]
 //!     Init --> Mark[记录已初始化]
 //!     Mark --> Advance
 //!     Strict[已初始化 StrictMachine 接收输入] --> Advance
-//!     Advance --> Outcome{处理结果}
-//!     Outcome -->|Unhandled| Unhandled[返回 Unhandled]
-//!     Outcome -->|Handled| Change{Transition}
-//!     Change -->|Stay| Handled[返回 Handled 和事件]
+//!     Advance --> Result{处理结果}
+//!     Result -->|Err| Error[返回 Unhandled 或 Custom 错误]
+//!     Result -->|Ok| Change{Outcome 中的 Transition}
+//!     Change -->|Stay| Events[返回 Ok 和事件]
 //!     Change -->|To| Exit[旧状态退出钩子]
 //!     Exit --> Replace[替换状态]
 //!     Replace --> Entry[新状态进入钩子]
-//!     Entry --> Handled
+//!     Entry --> Events
 //! ```
 //!
 //! 父状态可以持有拥有另一种上下文的完整子机器。子机器不隐式共享父上下文，
 //! 输入路由、事件汇总、等待条件及流程完成语义均由父状态或具体业务定义。
-//! 返回 [`Outcome::Unhandled`] 前不修改领域数据属于实现契约。
-//! 驱动不提供跨机器事务、panic 回滚或外部副作用恢复。
+//! 返回任一错误前保持方法入口的状态与上下文属于实现契约。
+//! 错误不会触发状态转换钩子，驱动不提供跨机器事务、数据回滚或外部副作用恢复。
 
-mod dispatch;
+mod error;
 mod machine;
 mod outcome;
 mod state;
 mod transition;
 
-pub use dispatch::DispatchResult;
+pub use error::Error;
 pub use machine::{Initialized, IntoMachineState, Machine, StrictMachine, Uninitialized};
 pub use outcome::Outcome;
 pub use state::State;
@@ -74,6 +74,12 @@ where
 
     /// 输入推进产生的事件类型，其业务含义与可见范围由上层定义。
     type Event;
+
+    /// 输入执行失败时携带的具体业务错误。
+    ///
+    /// 当前状态不处理输入时使用 [`Error::Unhandled`]；业务错误由 [`Error::Custom`]
+    /// 包装。该类型不额外要求克隆、线程共享或静态生命周期。
+    type Error: std::error::Error;
 
     /// 构造初始状态值，不执行进入钩子。
     ///
