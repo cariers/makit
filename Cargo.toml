@@ -23,6 +23,7 @@ members = [
     "crates/makit-core",
     "crates/makit-engine",
     "crates/makit-machine",
+    "examples/headless",
 ]
 default-members = [
     ".",
@@ -30,6 +31,7 @@ default-members = [
     "crates/makit-core",
     "crates/makit-engine",
     "crates/makit-machine",
+    "examples/headless",
 ]
 resolver = "3"
 

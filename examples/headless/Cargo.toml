@@ -1,0 +1,15 @@
+[package]
+name = "makit-headless"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "使用统一根导出驱动洗牌与定庄的无界面演示"
+readme = "README.md"
+publish = false
+
+[dependencies]
+makit.workspace = true
+
+[lints]
+workspace = true

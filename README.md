@@ -51,9 +51,21 @@ flowchart TD
 
 当前引擎提供启动、阶段处理及终态输出契约，已提供洗牌与定庄行动。具体行牌流程、网络交互和恢复协议需要由后续明确的场景补充。
 
+## Headless 演示
+
+`examples/headless` 同时提供可复用的演示库与无界面命令行程序，通过 `Machine<Engine<DemoVariant>>` 驱动洗牌、定庄并输出准备结果。
+
+```bash
+cargo run -p makit-headless --locked
+cargo run -p makit-headless --locked -- --align-east
+cargo run -p makit-headless --locked -- --help
+```
+
+演示使用固定的 8 张牌、位置 1、3、4 和默认种子，便于重复核对结果；它只展示准备流程。可通过 `--seed` 指定完整的 32 字节十六进制种子，通过 `--align-east` 将东风切换到庄家。参数与库调用方式见 [演示说明](examples/headless/README.md)。
+
 ## 开发与检查
 
-项目使用 Rust 2024 edition。根目录的默认 workspace 成员覆盖根包及全部底层 crate，可执行：
+项目使用 Rust 2024 edition。根目录的默认 workspace 成员覆盖根包、全部底层 crate 和 headless 演示，可执行：
 
 ```bash
 cargo fmt --all -- --check
