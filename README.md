@@ -59,6 +59,8 @@ flowchart TD
 
 执行接口均返回 `Result`。Action 直接返回自身业务错误；Phase 负责路由输入，将行动错误映射为变体错误并包装到 `Error::Custom(E)`。Phase 和 Machine 使用 `Error::Unhandled` 表示输入不适用于当前状态；`Error::map_custom` 用于汇总已经包装的子阶段或子机错误。机器成功派发返回有序事件；错误不追加成功记录或触发转换钩子。返回错误前保持数据不变是实现契约，驱动不提供回滚；首次派发前已完成的初始化会保留。
 
+`MachineContext` 提供 `before_dispatch`、`after_dispatch`、`dispatch_error` 与 `before_transition` / `after_transition` 五个默认空钩子，由内部驱动统一调用。成功收尾与转换维护可修改上下文；派发前观察与业务错误通知只读。`dispatch_error` 仅接收具体业务错误，`Unhandled` 直接返回；初始化只执行初始状态的进入钩子。
+
 当前引擎提供启动、阶段处理及终态输出契约，已提供洗牌与定庄行动。具体行牌流程、网络交互和恢复协议需要由后续明确的场景补充。
 
 ## Headless 演示

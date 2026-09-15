@@ -21,7 +21,7 @@ pub struct Uninitialized;
 /// 每个实例独立持有上下文与状态，父状态可持有自己的子机器。
 ///
 /// 通过 [`Deref`] 共享访问上下文，同时保留显式的上下文与状态查询。
-/// 克隆保留类型阶段，不重放状态钩子。
+/// 克隆保留类型阶段，不重放状态或上下文钩子。
 pub struct StrictMachine<M, T>
 where
     M: MachineContext,
@@ -53,6 +53,8 @@ where
     M::State: State<M>,
 {
     /// 消费未初始化机器，执行进入钩子并返回已初始化机器。
+    ///
+    /// 初始化仅执行初始状态进入，不调用上下文的派发或转换钩子。
     #[must_use]
     pub fn init(mut self) -> StrictMachine<M, Initialized> {
         self.inner.init();
@@ -70,13 +72,22 @@ where
 {
     /// 派发一次输入，成功时返回有序事件。
     ///
-    /// `Ok` 表示本次处理与状态切换均已完成，即使事件为空也属于已处理；
+    /// 先执行 [`MachineContext::before_dispatch`] 和输入推进，成功时完成所需转换及其钩子，
+    /// 最后调用 [`MachineContext::after_dispatch`]，再原样返回事件。
+    /// `Ok` 表示本次处理、状态切换与成功收尾均已完成，即使事件为空也属于已处理；
     /// 状态转换不会交给调用方再次执行。
     ///
     /// # Errors
     ///
     /// 原样返回 [`State::advance`] 的 [`Error::Unhandled`] 或 [`Error::Custom`]。
+    /// 前者没有结果回调，后者先调用 [`MachineContext::dispatch_error`] 观察具体业务错误；
+    /// 两者均不调用 [`MachineContext::after_dispatch`]。
     /// 错误不执行转换钩子；状态实现应保持推进方法入口的状态与上下文，驱动不提供回滚。
+    ///
+    /// # Panics
+    ///
+    /// 推进、钩子或状态析构中的 panic 会直接传播，后续钩子不保证执行，
+    /// 也不会转为业务错误通知或自动回滚。
     pub fn dispatch(&mut self, input: &M::Input<'_>) -> Result<Box<[M::Event]>, Error<M::Error>> {
         self.inner.dispatch(input)
     }

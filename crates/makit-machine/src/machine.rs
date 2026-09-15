@@ -20,7 +20,7 @@ use crate::{Error, MachineContext, State, machine::inner::Inner};
 /// 初始化阶段若能由类型表达，可以使用 [`StrictMachine`]。
 ///
 /// 通过 [`Deref`] 共享访问上下文，同时保留显式的上下文与状态查询。
-/// 克隆保留初始化标记，不重放状态钩子。
+/// 克隆保留初始化标记，不重放状态或上下文钩子。
 pub struct Machine<M>
 where
     M: MachineContext,
@@ -61,6 +61,7 @@ where
     ///
     /// 进入钩子正常结束后才记录为已初始化，重复调用不会重放进入钩子。
     /// 可以显式提前调用，也可以由 [`dispatch`](Self::dispatch) 自动调用。
+    /// 初始化不调用上下文的派发或转换钩子。
     pub fn init(&mut self) {
         if !self.initialized {
             self.inner.init();
@@ -70,15 +71,24 @@ where
 
     /// 按需完成初始化并派发一次输入，成功时返回有序事件。
     ///
-    /// 每次调用先通过 [`init`](Self::init) 确保机器已初始化。
-    /// `Ok` 表示本次处理与状态切换均已完成，即使事件为空也属于已处理；
+    /// 每次调用先通过 [`init`](Self::init) 确保机器已初始化，再执行
+    /// [`MachineContext::before_dispatch`] 和输入推进。成功时完成所需转换及其钩子，
+    /// 最后调用 [`MachineContext::after_dispatch`]，再原样返回事件。
+    /// `Ok` 表示本次处理、状态切换与成功收尾均已完成，即使事件为空也属于已处理；
     /// 状态转换不会交给调用方再次执行。
     ///
     /// # Errors
     ///
     /// 原样返回 [`State::advance`] 的 [`Error::Unhandled`] 或 [`Error::Custom`]。
+    /// 前者没有结果回调，后者先调用 [`MachineContext::dispatch_error`] 观察具体业务错误；
+    /// 两者均不调用 [`MachineContext::after_dispatch`]。
     /// 错误不执行转换钩子；状态实现应保持推进方法入口的状态与上下文，驱动不提供回滚。
     /// 首次派发在推进前完成的初始化会保留，后续派发也不会重放初始进入钩子。
+    ///
+    /// # Panics
+    ///
+    /// 初始化、推进、钩子或状态析构中的 panic 会直接传播，后续钩子不保证执行，
+    /// 也不会转为业务错误通知或自动回滚。
     pub fn dispatch(&mut self, input: &M::Input<'_>) -> Result<Box<[M::Event]>, Error<M::Error>> {
         // 初始化属于机器生命周期，后续推进的任一错误都不会撤销它。
         self.init();
