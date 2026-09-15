@@ -3,6 +3,16 @@
 version = 4
 
 [[package]]
+name = "makit"
+version = "0.1.0"
+dependencies = [
+ "makit-context",
+ "makit-core",
+ "makit-engine",
+ "makit-machine",
+]
+
+[[package]]
 name = "makit-context"
 version = "0.1.0"
 dependencies = [
