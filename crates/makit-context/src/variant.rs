@@ -1,10 +1,15 @@
 //! 规则配置、整手状态与逐座状态的变体扩展契约。
 
+use crate::Context;
+
 /// 定义通用上下文之外的规则与两个作用域的状态。
 ///
 /// 关联类型由调用者显式构造，没有专属数据的作用域可以使用 `()`。
 /// 本 trait 不要求 `Default`、`Clone` 或 `Debug`，也不提供隐式初始化或流程钩子。
-pub trait Variant {
+pub trait Variant
+where
+    Self: Sized,
+{
     /// 当前一手采用的规则配置。
     type Rule;
 
@@ -13,4 +18,7 @@ pub trait Variant {
 
     /// 随座位加入建立的专属状态，例如个人限制或变体持牌区。
     type SeatContext;
+
+    /// 根据规则创建一个上下文
+    fn initial_context(rule: Self::Rule) -> Context<Self>;
 }

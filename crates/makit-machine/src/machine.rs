@@ -68,15 +68,15 @@ where
         }
     }
 
-    /// 按需完成初始化，检查 Guard 并推进一次输入，返回执行结果。
+    /// 按需完成初始化并派发一次输入，返回处理结果。
     ///
     /// 每次调用先通过 [`init`](Self::init) 确保机器已初始化。
-    /// [`DispatchResult::GuardBlocked`] 表示本次输入没有调用推进逻辑或切换钩子，
+    /// [`DispatchResult::Unhandled`] 表示当前状态未处理本次输入，驱动不执行切换钩子，
     /// 但不会撤销首次调用已经完成的初始化；后续派发也不会重放初始进入钩子。
-    /// [`DispatchResult::Executed`] 表示本次推进与状态切换均已完成，
-    /// 即使事件为空也属于已执行；状态转换不会交给调用方再次执行。
+    /// [`DispatchResult::Handled`] 表示本次处理与状态切换均已完成，
+    /// 即使事件为空也属于已处理；状态转换不会交给调用方再次执行。
     pub fn dispatch(&mut self, input: &M::Input<'_>) -> DispatchResult<M::Event> {
-        // 初始进入属于机器生命周期，Guard 受限不会撤销已完成的初始化。
+        // 初始进入属于机器生命周期，输入未处理不会撤销已完成的初始化。
         self.init();
         self.inner.dispatch(input)
     }

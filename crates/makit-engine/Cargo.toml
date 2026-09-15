@@ -1,0 +1,16 @@
+[package]
+name = "makit-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+makit-core.workspace = true
+makit-machine.workspace = true
+makit-context.workspace = true
+rand.workspace = true
+rand_chacha.workspace = true
+
+[lints]
+workspace = true

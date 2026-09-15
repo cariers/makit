@@ -68,11 +68,11 @@ where
     M: MachineContext,
     M::State: State<M>,
 {
-    /// 检查 Guard 并推进一次输入，返回执行结果。
+    /// 派发一次输入，返回处理结果。
     ///
-    /// [`DispatchResult::GuardBlocked`] 表示没有调用推进逻辑或转换钩子。
-    /// [`DispatchResult::Executed`] 表示本次推进与状态切换均已完成，
-    /// 即使事件为空也属于已执行；状态转换不会交给调用方再次执行。
+    /// [`DispatchResult::Unhandled`] 表示当前状态未处理输入，驱动不执行转换钩子。
+    /// [`DispatchResult::Handled`] 表示本次处理与状态切换均已完成，
+    /// 即使事件为空也属于已处理；状态转换不会交给调用方再次执行。
     pub fn dispatch(&mut self, input: &M::Input<'_>) -> DispatchResult<M::Event> {
         self.inner.dispatch(input)
     }

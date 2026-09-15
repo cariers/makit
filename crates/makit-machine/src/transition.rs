@@ -13,34 +13,3 @@ pub enum Transition<S> {
     /// 即使新旧状态在业务上相等，也按显式转换执行钩子。
     To(S),
 }
-
-/// 状态实现产生的单次推进描述，由机器驱动消费。
-///
-/// 事件保持实现给出的顺序，允许为空；状态转换尚未由驱动应用，
-/// 因而该值不能直接视为对外的执行结果。
-#[must_use]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Step<S, E> {
-    /// 本次推进产生的有序事件。
-    pub events: Box<[E]>,
-    /// 本次推进要求驱动应用的状态转换。
-    pub transition: Transition<S>,
-}
-
-impl<S, E> Step<S, E> {
-    /// 构造保留当前状态的推进描述，事件可由数组、`Vec` 或装箱切片传入。
-    pub fn stay(events: impl Into<Box<[E]>>) -> Self {
-        Self {
-            events: events.into(),
-            transition: Transition::Stay,
-        }
-    }
-
-    /// 构造切换到指定状态的推进描述，事件可由数组、`Vec` 或装箱切片传入。
-    pub fn to(state: S, events: impl Into<Box<[E]>>) -> Self {
-        Self {
-            events: events.into(),
-            transition: Transition::To(state),
-        }
-    }
-}

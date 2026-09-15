@@ -1,4 +1,4 @@
-use crate::{DispatchResult, MachineContext, State, Step, Transition};
+use crate::{DispatchResult, MachineContext, Outcome, State, Transition};
 
 /// 两种包装器共用的状态存储与单次推进逻辑。
 pub(super) struct Inner<M>
@@ -40,12 +40,11 @@ where
     }
 
     pub(super) fn dispatch(&mut self, input: &M::Input<'_>) -> DispatchResult<M::Event> {
-        if !self.state.guard(&self.context, input) {
-            return DispatchResult::GuardBlocked;
-        }
-
-        // 检查后立即使用同一份输入推进，不缓存 Guard 结论或暴露中间状态。
-        let Step { events, transition } = self.state.advance(&mut self.context, input);
+        let Outcome::Handled { events, transition } = self.state.advance(&mut self.context, input)
+        else {
+            // 未处理只终止本次派发，实现须保证此前没有产生领域修改。
+            return DispatchResult::Unhandled;
+        };
 
         if let Transition::To(next) = transition {
             self.state.handle_exit_action(&mut self.context);
@@ -53,7 +52,7 @@ where
             self.state.handle_entry_action(&mut self.context);
         }
 
-        DispatchResult::Executed { events }
+        DispatchResult::Handled { events }
     }
 }
 
