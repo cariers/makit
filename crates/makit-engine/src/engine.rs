@@ -13,23 +13,21 @@ use crate::{Phase, PhaseOutcome, PhaseVariant};
 /// 输入记录仅包含阶段已处理的输入，不包含启动指令或未处理输入。
 /// 事件按产生顺序留存副本，同时作为本次派发结果返回。
 /// 整手结束的输入与事件同样记录，最终结果由 [`EngineState::Finished`] 持有。
-pub struct Engine<V, P>
+pub struct Engine<V>
 where
-    P: Phase<V>,
-    V: PhaseVariant<Phase = P>,
+    V: PhaseVariant,
 {
     /// 当前一局的领域上下文。
     context: Context<V>,
     /// 已处理阶段输入的顺序记录。
-    inputs: VecDeque<P::Input>,
+    inputs: VecDeque<V::Input>,
     /// 已处理阶段事件的顺序记录，与派发结果分别持有事件值。
-    events: VecDeque<P::Event>,
+    events: VecDeque<V::Event>,
 }
 
-impl<V, P> Engine<V, P>
+impl<V> Engine<V>
 where
-    P: Phase<V>,
-    V: PhaseVariant<Phase = P>,
+    V: PhaseVariant,
 {
     /// 委托变体使用规则构造初始局上下文，并创建空的输入与事件记录。
     ///
@@ -78,30 +76,28 @@ impl<P, O> EngineState<P, O> {
     }
 }
 
-impl<V, P> MachineContext for Engine<V, P>
+impl<V> MachineContext for Engine<V>
 where
-    P: Phase<V>,
-    V: PhaseVariant<Phase = P>,
+    V: PhaseVariant,
 {
-    type State = EngineState<P, P::Output>;
-    type Input<'ipt> = EngineInput<P::Input>;
-    type Event = P::Event;
+    type State = EngineState<V::Phase, V::Output>;
+    type Input<'ipt> = EngineInput<V::Input>;
+    type Event = V::Event;
 
     fn initial_state() -> Self::State {
         EngineState::Preparing
     }
 }
 
-impl<V, P> State<Engine<V, P>> for EngineState<P, P::Output>
+impl<V> State<Engine<V>> for EngineState<V::Phase, V::Output>
 where
-    P: Phase<V>,
-    V: PhaseVariant<Phase = P>,
+    V: PhaseVariant,
 {
     fn advance(
         &mut self,
-        ctx: &mut Engine<V, P>,
-        input: &EngineInput<P::Input>,
-    ) -> MachineOutcome<Self, P::Event> {
+        ctx: &mut Engine<V>,
+        input: &EngineInput<V::Input>,
+    ) -> MachineOutcome<Self, V::Event> {
         match (self, input) {
             (EngineState::Preparing, EngineInput::Start) => {
                 let phase = V::initial_phase(&ctx.context);

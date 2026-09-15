@@ -4,9 +4,10 @@
 //! 启动返回 [`Progress`]，区分继续运行与行动完成；后续输入返回 [`ActionOutcome`]，
 //! 还可以表达未处理。调用行动、解释完成进度及安排后续输入由阶段实现负责。
 //!
-//! [`Phase`] 关联输入、事件及整手结果 [`Phase::Output`]。阶段处理通过 [`PhaseOutcome`]
-//! 表达未处理、继续推进或整手结束；[`PhaseOutcome::Finished`] 同时交付最终结果与
-//! 最后一批事件，行动的 [`Progress::Complete`] 则仅表示该行动结束。
+//! [`PhaseVariant`] 声明输入、事件及整手结果 [`PhaseVariant::Output`]，并指定主阶段。
+//! [`Phase`] 使用这些类型处理阶段逻辑，通过 [`PhaseOutcome`] 表达未处理、继续推进或
+//! 整手结束；[`PhaseOutcome::Finished`] 同时交付最终结果与最后一批事件，
+//! 行动的 [`Progress::Complete`] 则仅表示该行动结束。
 //!
 //! [`Engine`] 持有局上下文及已处理输入、事件的记录，[`EngineInput`] 区分启动和阶段输入。
 //! `EngineState<P, O>::Finished(O)` 独立持有最终结果；派发完成后可通过

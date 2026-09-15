@@ -8,25 +8,13 @@ pub use outcome::PhaseOutcome;
 
 /// 由具体玩法定义的阶段状态及其输入处理。
 ///
-/// 各业务阶段由实现类型的枚举分支或内部结构表达，共用相同的输入、事件和整手结果类型。
+/// 各业务阶段由实现类型的枚举分支或内部结构表达，共用 [`PhaseVariant`] 声明的协议类型。
 /// 行动完成后的阶段编排由该实现决定；只有整手玩法结束时才交付最终结果。
 pub trait Phase<V>
 where
     Self: Sized,
-    V: Variant,
+    V: PhaseVariant,
 {
-    /// 阶段输入；引擎保存每次已处理输入的副本。
-    type Input: Clone;
-
-    /// 本次处理产生的事件；引擎同时留存事件副本并向调用方返回原始事件。
-    type Event: Clone;
-
-    /// 整手玩法结束后交付的业务结果，由具体变体定义。
-    ///
-    /// 结果移动到引擎终态，不要求实现 `Clone`、`Default` 或序列化能力。
-    /// 没有专属结果的玩法可以使用 `()`。
-    type Output;
-
     /// 处理一次输入，返回未处理、继续推进或整手结束。
     ///
     /// 返回 [`PhaseOutcome::Unhandled`] 前必须完成只读判断，不得修改阶段、局上下文、
@@ -39,16 +27,28 @@ where
     fn handle(
         &mut self,
         ctx: &mut Context<V>,
-        input: &Self::Input,
-    ) -> PhaseOutcome<Self, Self::Event, Self::Output>;
+        input: &V::Input,
+    ) -> PhaseOutcome<Self, V::Event, V::Output>;
 }
 
-/// 将数据变体关联到具体玩法的阶段实现。
+/// 定义玩法的输入、事件、整手结果及主阶段入口。
 ///
-/// 输入、事件及整手结果由 [`Phase`] 声明，本 trait 只指定阶段类型及其初始值。
+/// 输入、事件及整手结果由本 trait 统一声明，[`Phase`] 使用这些类型处理阶段逻辑。
 pub trait PhaseVariant: Variant {
-    /// 定义阶段集合、输入、事件与整手结果的实现类型。
+    /// 玩法主阶段的实现类型。
     type Phase: Phase<Self>;
+
+    /// 阶段输入；引擎保存每次已处理输入的副本。
+    type Input: Clone;
+
+    /// 本次处理产生的事件；引擎同时留存事件副本并向调用方返回原始事件。
+    type Event: Clone;
+
+    /// 整手玩法结束后交付的业务结果，由具体变体定义。
+    ///
+    /// 结果移动到引擎终态，不要求实现 `Clone`、`Default` 或序列化能力。
+    /// 没有专属结果的玩法可以使用 `()`。
+    type Output;
 
     /// 根据既有局上下文创建初始阶段，不执行阶段输入。
     fn initial_phase(ctx: &Context<Self>) -> Self::Phase;
